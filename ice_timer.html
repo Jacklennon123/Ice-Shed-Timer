@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ice Shedding Timer</title>
+<style>
+:root{--bg:#eef3f8;--card:#fff;--text:#10202f;--muted:#5b6f82;--line:#c9d6e2;--accent:#1e6fa8;--ok:#0f8a6b;--warn:#c77d0a;--bad:#c62828;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1a2b;--card:#132a40;--text:#f0f4f8;--muted:#9fb3c8;--line:#2a4a66;--accent:#3fa9f5;--ok:#4fd1c5;--warn:#f5b73f;--bad:#ff6b6b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1a2b;--card:#132a40;--text:#f0f4f8;--muted:#9fb3c8;--line:#2a4a66;--accent:#3fa9f5;--ok:#4fd1c5;--warn:#f5b73f;--bad:#ff6b6b;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;padding:20px;display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:640px}
+h1{text-align:center;font-size:1.5rem;margin:6px 0 2px}
+.sub{text-align:center;color:var(--muted);margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
+.lbl{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.row{display:flex;gap:10px}
+.ac{flex:1;padding:18px 8px;font-size:1.05rem;font-weight:700;border-radius:12px;border:2px solid var(--line);background:transparent;color:var(--text)}
+.ac.sel{border-color:var(--accent);background:var(--accent);color:#fff}
+.info{margin-top:12px;text-align:center;color:var(--muted)}
+.info b{color:var(--text)}
+.off{opacity:.4;pointer-events:none}
+.status{text-align:center;font-weight:700;min-height:1.5em;font-size:1.1rem}
+.timer{text-align:center;font-size:5rem;font-weight:800;font-variant-numeric:tabular-nums;margin:6px 0;color:var(--ok)}
+.timer.warn{color:var(--warn)}.timer.bad{color:var(--bad)}
+.status.warn{color:var(--warn)}.status.bad{color:var(--bad)}
+.card.flash{animation:fl 1s infinite}
+@keyframes fl{50%{border-color:var(--bad);box-shadow:0 0 0 4px var(--bad)}}
+.custom{display:flex;gap:8px;align-items:center;justify-content:center;margin:14px 0}
+.custom span{color:var(--muted)}
+input{width:84px;padding:12px;font-size:1.1rem;text-align:center;border-radius:10px;border:2px solid var(--line);background:transparent;color:var(--text)}
+button.go{width:100%;padding:18px;font-size:1.15rem;font-weight:700;border:0;border-radius:12px;color:#fff;margin-top:10px}
+.start{background:#1a8a5f}.pause{background:#b8791a}.reset{background:#a83232}.stopbtn{background:#555f6b}.set{background:var(--accent);padding:12px 18px;font-size:1rem;font-weight:700;border:0;border-radius:10px;color:#fff}
+.usage{text-align:center;font-weight:700;font-size:1.1rem;line-height:1.4;margin:0 0 16px}
+.note{text-align:center;color:var(--muted);font-size:1.05rem;line-height:1.5;margin-top:8px}.warnbig{display:block;color:var(--bad);font-weight:800;font-size:1.5rem;letter-spacing:.03em;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Ice Shedding Timer</h1>
+  <div class="sub">Engines running time until next ice shedding</div>
+  <div class="usage">To be used when icing conditions exist and OAT is +3°C (37°F) or below</div>
+
+  <div class="card">
+    <div class="lbl">Select aircraft</div>
+    <div class="row">
+      <button class="ac" id="b0" onclick="pick(0)">A319 / A320 / A321</button>
+      <button class="ac" id="b1" onclick="pick(1)">A321NEO</button>
+    </div>
+    <div class="info" id="info">Select an aircraft to load its parameters.</div>
+  </div>
+
+  <div class="card off" id="tcard">
+    <div class="status" id="status">&nbsp;</div>
+    <div class="timer" id="timer">--:--</div>
+    <div class="custom">
+      <span>Time remaining</span>
+      <input type="number" inputmode="numeric" id="cm" min="0" placeholder="min">
+      <span>:</span>
+      <input type="number" inputmode="numeric" id="cs" min="0" max="59" placeholder="sec">
+      <button class="set" onclick="setCustom()">Set</button>
+    </div>
+    <button class="go start" id="sp" onclick="toggle()">Start Timer</button>
+    <button class="go reset" onclick="resetT()">Ice Shed Complete – Reset</button>
+    <button class="go stopbtn" id="stopBtn" onclick="stopManual()">Stop</button>
+  </div>
+
+  <div class="note"><span class="warnbig">NOT FOR OPERATIONAL USE. DO NOT SHARE.</span>Prototype for discussion only.</div>
+</div>
+
+<script>
+const AC=[
+ {name:'A319/A320/A321',n1:70,hold:30,mins:30},
+ {name:'A321NEO',n1:60,hold:30,mins:30,req:true,note:'Takeoff must be within 5 mins of final ice shed procedure'}
+];
+let cur=null,max=0,rem=0,run=false,endAt=0,iv=null,alerted=false;
+const $=id=>document.getElementById(id);
+
+function pick(i){
+  cur=AC[i];max=cur.mins*60;
+  $('b0').classList.toggle('sel',i===0);$('b1').classList.toggle('sel',i===1);
+  $('info').innerHTML='Interval: <b>'+cur.mins+' min</b> &nbsp;|&nbsp; Ice shed: <b>'+cur.n1+'% N1</b>'+(cur.req?' <b>(required)</b>':'')+' for <b>'+cur.hold+' sec</b>'+(cur.note?'<br><b>'+cur.note+'</b>':'');
+  $('tcard').classList.remove('off');
+  stop();rem=0;alerted=false;$('tcard').classList.remove('flash');
+  $('cm').value=cur.mins;$('cs').value=0;
+  draw();msg('Enter time remaining and press Set, then Start.','');
+}
+function setCustom(){
+  if(!cur)return;
+  let t=(parseInt($('cm').value)||0)*60+(parseInt($('cs').value)||0);
+  rem=Math.max(0,Math.min(t,max));stop();draw();
+  msg('Time set. Press Start when engines are running.','');
+}
+function toggle(){
+  if(!cur)return;
+  if(run){stop();msg('Paused.','');return}
+  if(rem<=0)return;
+  run=true;alerted=false;endAt=Date.now()+rem*1000;
+  iv=setInterval(tick,250);btn();msg('Timer running.','');
+  beepInit();
+}
+function tick(){
+  rem=Math.max(0,Math.ceil((endAt-Date.now())/1000));draw();
+  if(rem===0){
+    stop();
+    $('tcard').classList.add('flash');
+    msg(cur&&cur.name==='A321NEO'?'MAINTENANCE ACTION REQUIRED':'ICE SHEDDING REQUIRED NOW','bad');
+    if(!alerted){
+      alerted=true;beep();if(navigator.vibrate)navigator.vibrate([400,200,400,200,400]);
+      if(cur && cur.name==='A321NEO'){
+        setTimeout(()=>{alert('MAINTENANCE ACTION REQUIRED')},150);
+      }
+    }
+  }else if(rem<=300){msg('Ice shedding due in '+Math.ceil(rem/60)+' min','warn')}
+}
+function stop(){run=false;clearInterval(iv);btn()}
+function resetT(){
+  if(!cur)return;
+  stop();
+  rem=max;alerted=false;$('tcard').classList.remove('flash');
+  $('cm').value=cur.mins;$('cs').value=0;
+  draw();
+  run=true;endAt=Date.now()+rem*1000;
+  iv=setInterval(tick,250);btn();
+  beepInit();
+  msg('Ice shedding complete. Timer reset to '+cur.mins+' min and running.','');
+}
+function stopManual(){
+  if(!cur)return;
+  stop();
+  msg('Timer stopped.','');
+}
+function btn(){const b=$('sp');b.textContent=run?'Pause Timer':'Start Timer';b.className='go '+(run?'pause':'start')}
+function draw(){
+  const m=String(Math.floor(rem/60)).padStart(2,'0'),s=String(rem%60).padStart(2,'0');
+  const t=$('timer');t.textContent=m+':'+s;
+  t.className='timer'+(rem===0&&cur?' bad':rem<=300&&cur?' warn':'');
+  if(rem>0)$('tcard').classList.remove('flash');
+}
+function msg(t,c){const e=$('status');e.textContent=t;e.className='status '+c}
+
+let ctx=null;
+function beepInit(){try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume()}catch(e){}}
+function beep(){
+  try{if(!ctx)return;
+    for(let i=0;i<3;i++){
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.frequency.value=880;o.connect(g);g.connect(ctx.destination);
+      const t=ctx.currentTime+i*0.45;g.gain.setValueAtTime(0.3,t);
+      o.start(t);o.stop(t+0.3);
+    }
+  }catch(e){}
+}
+</script>
+</body>
+</html>
