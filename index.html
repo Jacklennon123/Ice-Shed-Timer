@@ -26,7 +26,7 @@ h1{text-align:center;font-size:1.5rem;margin:6px 0 2px}
 .timer{text-align:center;font-size:5rem;font-weight:800;font-variant-numeric:tabular-nums;margin:6px 0;color:var(--ok)}
 .timer.warn{color:var(--warn)}.timer.bad{color:var(--bad)}
 .status.warn{color:var(--warn)}.status.bad{color:var(--bad)}
-.card.flash{animation:fl 1s infinite}
+.card.flash,.card.flash5{animation:fl 1s infinite}
 @keyframes fl{50%{border-color:var(--bad);box-shadow:0 0 0 4px var(--bad)}}
 .custom{display:flex;gap:8px;align-items:center;justify-content:center;margin:14px 0}
 .custom span{color:var(--muted)}
@@ -37,6 +37,12 @@ button.go{width:100%;padding:18px;font-size:1.15rem;font-weight:700;border:0;bor
 .docs{display:flex;gap:10px;margin-top:8px}
 .docbtn{flex:1;padding:16px 8px;font-size:1rem;font-weight:700;border-radius:12px;border:2px solid var(--accent);background:transparent;color:var(--text)}
 .nm{border:2px solid var(--line);background:transparent;color:var(--text);padding:10px 16px;border-radius:999px;font-size:1rem;font-weight:700}
+.cav{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.cav .h{font-weight:600;color:var(--muted);font-size:.85rem}
+.cav .h.t10{color:#1e6fa8}
+:root[data-theme="night"] .cav .h.t10{color:#5cc0ff}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-weight:600;font-size:.85rem;color:var(--text)}
 .usage{text-align:center;font-weight:700;font-size:1.1rem;line-height:1.4;margin:0 0 16px}
 .note{text-align:center;color:var(--muted);font-size:1.05rem;line-height:1.5;margin-top:8px}.warnbig{display:block;color:var(--bad);font-weight:800;font-size:1.5rem;letter-spacing:.03em;margin-bottom:8px}
 </style>
@@ -78,16 +84,18 @@ button.go{width:100%;padding:18px;font-size:1.15rem;font-weight:700;border:0;bor
 
 <script>
 const AC=[
- {name:'A319/A320/A321',n1:70,hold:30,mins:30},
- {name:'A321NEO',n1:60,hold:30,mins:30,req:true,note:'Takeoff must be within 5 mins of final ice shed procedure'}
+ {name:'A319/A320/A321',n1:70,hold:30,mins:30,notreq:true,cav:true},
+ {name:'A321NEO',n1:60,hold:30,mins:30,req:true,cav2:true}
 ];
-let cur=null,max=0,rem=0,run=false,endAt=0,iv=null,alerted=false;
+const CAV='<div class="cav"><div class="h t10">&#9888; Interval is 10 min when operating in</div><div class="chips"><span class="chip">Heavy Snow (+SN)</span><span class="chip">Freezing Fog (FZFG)</span><span class="chip">Freezing Rain / Drizzle (FZRA / FZDZ)</span></div></div>';
+const CAV2='<div class="cav"><div class="h">&#9888; Takeoff must be within <span class="chip">5 mins of final ice shed procedure</span></div></div>';
+let cur=null,max=0,rem=0,run=false,endAt=0,iv=null,alerted=false,warned5=false;
 const $=id=>document.getElementById(id);
 
 function pick(i){
   cur=AC[i];max=cur.mins*60;
   $('b0').classList.toggle('sel',i===0);$('b1').classList.toggle('sel',i===1);
-  $('info').innerHTML='Interval: <b>'+cur.mins+' min</b> &nbsp;|&nbsp; Ice shed: <b>'+cur.n1+'% N1</b>'+(cur.req?' <b>(required)</b>':'')+' for <b>'+cur.hold+' sec</b>'+(cur.note?'<br><b>'+cur.note+'</b>':'');
+  $('info').innerHTML='Interval: <b>'+cur.mins+' min</b> &nbsp;|&nbsp; Ice shed: <b>'+cur.n1+'% N1</b>'+(cur.req?' <b>(required)</b>':'')+' for <b>'+cur.hold+' sec</b>'+(cur.notreq?' <b>(Target, not required)</b>':'')+(cur.cav?CAV:'')+(cur.cav2?CAV2:'');
   $('tcard').classList.remove('off');
   stop();rem=0;alerted=false;$('tcard').classList.remove('flash');
   $('cm').value=cur.mins;$('cs').value='00';
@@ -103,7 +111,7 @@ function toggle(){
   if(!cur)return;
   if(run){stop();msg('Paused.','');return}
   if(rem<=0)return;
-  run=true;alerted=false;endAt=Date.now()+rem*1000;
+  run=true;alerted=false;warned5=rem<=300;endAt=Date.now()+rem*1000;
   iv=setInterval(tick,250);btn();msg('Timer running.','');
   beepInit();
 }
@@ -119,13 +127,20 @@ function tick(){
         setTimeout(()=>{alert('MAINTENANCE ACTION REQUIRED')},150);
       }
     }
-  }else if(rem<=300){msg('Ice shedding due in '+Math.ceil(rem/60)+' min','warn')}
+  }else if(rem<=300){
+    if(cur&&!warned5){warned5=true;five()}
+    msg('Ice shedding due in '+Math.ceil(rem/60)+' min','warn')
+  }
+}
+function five(){
+  const c=$('tcard');c.classList.add('flash5');beep();
+  setTimeout(()=>{alert('5 MINUTE WARNING\n\n'+cur.name+' ice shedding due in 5 minutes.');c.classList.remove('flash5')},150);
 }
 function stop(){run=false;clearInterval(iv);btn()}
 function resetT(){
   if(!cur)return;
   stop();
-  rem=max;alerted=false;$('tcard').classList.remove('flash');
+  rem=max;alerted=false;warned5=false;$('tcard').classList.remove('flash','flash5');
   $('cm').value=cur.mins;$('cs').value='00';
   draw();
   run=true;endAt=Date.now()+rem*1000;
