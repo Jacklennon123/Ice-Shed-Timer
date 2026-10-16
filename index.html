@@ -95,7 +95,7 @@ const $=id=>document.getElementById(id);
 function pick(i){
   cur=AC[i];max=cur.mins*60;
   $('b0').classList.toggle('sel',i===0);$('b1').classList.toggle('sel',i===1);
-  $('info').innerHTML='Interval: <b>'+cur.mins+' min</b> &nbsp;|&nbsp; Ice shed: <b>'+cur.n1+'% N1</b>'+(cur.req?' <b>(required)</b>':'')+' for <b>'+cur.hold+' sec</b>'+(cur.notreq?' <b>(Target, not required)</b>':'')+(cur.cav?CAV:'')+(cur.cav2?CAV2:'');
+  $('info').innerHTML='Interval: <b>'+cur.mins+' min</b> &nbsp;|&nbsp; Ice shed: <b>'+cur.n1+'% N1</b>'+(cur.req?' <b>(Required)</b>':'')+' for <b>'+cur.hold+' sec</b>'+(cur.notreq?' <b>(Target, Not Required)</b>':'')+(cur.cav?CAV:'')+(cur.cav2?CAV2:'');
   $('tcard').classList.remove('off');
   stop();rem=0;alerted=false;$('tcard').classList.remove('flash');
   $('cm').value=cur.mins;$('cs').value='00';
